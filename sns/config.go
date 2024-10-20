@@ -24,7 +24,7 @@ type PublisherConfig struct {
 	// DoNotCreateTopicIfNotExists disables creating the topic if it does not exist.
 	DoNotCreateTopicIfNotExists bool
 
-	// TopicResolver is a function that resolves the topic name to the topic ARN.
+	// TopicResolver is a function that resolves the Watermill topic name to the topic ARN.
 	TopicResolver TopicResolver
 
 	// GenerateCreateTopicInput generates the input for the CreateTopic operation.
@@ -78,7 +78,7 @@ type SubscriberConfig struct {
 	// OptFns are options for the SNS client.
 	OptFns []func(*sns.Options)
 
-	// TopicResolver is a function that resolves the topic name to the topic ARN.
+	// TopicResolver is a function that resolves the Watermill topic name to the topic ARN.
 	TopicResolver TopicResolver
 
 	// GenerateSqsQueueName generates the name of the SQS queue for the SNS subscription.

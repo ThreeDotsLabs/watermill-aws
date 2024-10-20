@@ -14,49 +14,6 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/sqs/types"
 )
 
-// QueueUrlResolver resolves queue URL by topic passed to Publisher.Publish, Subscriber.Subscribe.
-type QueueUrlResolver interface {
-	ResolveQueueUrl(ctx context.Context, params ResolveQueueUrlParams) (QueueUrlResolverResult, error)
-}
-
-type ResolveQueueUrlParams struct {
-	// Topic passed to Publisher.Publish, Subscriber.Subscribe, etc.
-	// It may be mapped to a different name by QueueUrlResolver.
-	Topic     string
-	SqsClient *sqs.Client
-	Logger    watermill.LoggerAdapter
-}
-
-type QueueUrlResolverResult struct {
-	QueueName QueueName
-
-	// QueueURL is not present if queue doesn't exist.
-	QueueURL *QueueURL
-
-	// Exists says if queue exists.
-	// May be nil, if resolver doesn't have information about queue existence.
-	Exists *bool
-}
-
-// GenerateQueueUrlResolver is a resolver that generates queue URL based on AWS region and account ID.
-type GenerateQueueUrlResolver struct {
-	AwsRegion    string
-	AwsAccountID string
-}
-
-func (p GenerateQueueUrlResolver) ResolveQueueUrl(ctx context.Context, params ResolveQueueUrlParams) (QueueUrlResolverResult, error) {
-	queueURL := QueueURL(fmt.Sprintf(
-		"https://sqs.%s.amazonaws.com/%s/%s",
-		p.AwsRegion, p.AwsAccountID, params.Topic,
-	))
-
-	return QueueUrlResolverResult{
-		QueueName: QueueName(params.Topic), // in this case topic maps 1:1 to topic name
-		QueueURL:  &queueURL,
-		Exists:    nil, // we don't know
-	}, nil
-}
-
 type GetQueueUrlByNameUrlResolverConfig struct {
 	// DoNotCacheQueues disables caching of queue URLs.
 	DoNotCacheQueues bool
@@ -176,6 +133,50 @@ type GenerateGetQueueUrlInputFunc func(ctx context.Context, topic string) (*sqs.
 func GenerateGetQueueUrlInputDefault(ctx context.Context, topic string) (*sqs.GetQueueUrlInput, error) {
 	return &sqs.GetQueueUrlInput{
 		QueueName: aws.String(topic),
+	}, nil
+}
+
+// QueueUrlResolver resolves queue URL by topic passed to Publisher.Publish, Subscriber.Subscribe.
+type QueueUrlResolver interface {
+	ResolveQueueUrl(ctx context.Context, params ResolveQueueUrlParams) (QueueUrlResolverResult, error)
+}
+
+type ResolveQueueUrlParams struct {
+	// Topic passed to Publisher.Publish, Subscriber.Subscribe, etc.
+	// It may be mapped to a different name by QueueUrlResolver.
+	Topic     string
+	SqsClient *sqs.Client
+	Logger    watermill.LoggerAdapter
+}
+
+type QueueUrlResolverResult struct {
+	QueueName QueueName
+
+	// QueueURL is not present if queue doesn't exist.
+	QueueURL *QueueURL
+
+	// Exists says if queue exists.
+	// May be nil, if resolver doesn't have information about queue existence.
+	Exists *bool
+}
+
+// GenerateQueueUrlResolver is a resolver that generates queue URL based on AWS region and account ID.
+// Topic name passed to Publisher.Publish, Subscriber.Subscribe is mapped to queue name.
+type GenerateQueueUrlResolver struct {
+	AwsRegion    string
+	AwsAccountID string
+}
+
+func (p GenerateQueueUrlResolver) ResolveQueueUrl(ctx context.Context, params ResolveQueueUrlParams) (QueueUrlResolverResult, error) {
+	queueURL := QueueURL(fmt.Sprintf(
+		"https://sqs.%s.amazonaws.com/%s/%s",
+		p.AwsRegion, p.AwsAccountID, params.Topic,
+	))
+
+	return QueueUrlResolverResult{
+		QueueName: QueueName(params.Topic), // in this case topic maps 1:1 to topic name
+		QueueURL:  &queueURL,
+		Exists:    nil, // we don't know
 	}, nil
 }
 

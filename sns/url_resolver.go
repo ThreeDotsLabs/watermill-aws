@@ -12,6 +12,7 @@ type TopicResolver interface {
 }
 
 // TransparentTopicResolver is a TopicResolver that passes the topic as is.
+// You should use SNS topic ARN as in Subscribe and Publish.
 type TransparentTopicResolver struct{}
 
 func (a TransparentTopicResolver) ResolveTopic(ctx context.Context, topic string) (snsTopic TopicArn, err error) {
@@ -21,6 +22,8 @@ func (a TransparentTopicResolver) ResolveTopic(ctx context.Context, topic string
 
 // GenerateArnTopicResolver is a TopicResolver that generates ARN for the topic
 // using the provided account ID and region.
+//
+// You should use this resolver if you want to pass only the topic name to Subscribe and Publish.
 type GenerateArnTopicResolver struct {
 	accountID string
 	region    string
