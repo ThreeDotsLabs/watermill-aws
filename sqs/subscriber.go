@@ -297,6 +297,10 @@ func (s *Subscriber) SubscribeInitializeWithContext(ctx context.Context, topic s
 		return nil
 	}
 
+	if s.config.DoNotCreateQueueIfNotExists {
+		return fmt.Errorf("queue for topic '%s' doesn't exists", topic)
+	}
+
 	input, err := s.config.GenerateCreateQueueInput(ctx, resolvedQueue.QueueName, s.config.QueueConfigAttributes)
 	if err != nil {
 		return fmt.Errorf("cannot generate input for queue %s: %w", topic, err)
