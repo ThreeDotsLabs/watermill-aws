@@ -40,6 +40,9 @@ func (d DefaultMarshalerUnmarshaler) Unmarshal(msg *types.Message) (*message.Mes
 	if value, ok := msg.MessageAttributes[UUIDAttribute]; ok {
 		uuid = *value.StringValue
 		delete(attributes, UUIDAttribute)
+	} else if msg.MessageId != nil {
+		// fallback when message is not published by Watermill
+		uuid = *msg.MessageId
 	}
 
 	if msg.Body != nil {
