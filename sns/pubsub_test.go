@@ -8,6 +8,7 @@ import (
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	awsconfig "github.com/aws/aws-sdk-go-v2/config"
+	"github.com/aws/aws-sdk-go-v2/credentials"
 	amazonsns "github.com/aws/aws-sdk-go-v2/service/sns"
 	amazonsqs "github.com/aws/aws-sdk-go-v2/service/sqs"
 	transport "github.com/aws/smithy-go/endpoints"
@@ -215,6 +216,12 @@ func GetAWSConfig(t *testing.T) aws.Config {
 	cfg, err := awsconfig.LoadDefaultConfig(
 		context.Background(),
 		awsconfig.WithRegion("us-west-2"),
+		awsconfig.WithCredentialsProvider(credentials.StaticCredentialsProvider{
+			Value: aws.Credentials{
+				AccessKeyID:     "test",
+				SecretAccessKey: "test",
+			},
+		}),
 	)
 	require.NoError(t, err)
 
