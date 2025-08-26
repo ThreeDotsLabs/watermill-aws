@@ -32,6 +32,9 @@ func TestPublishSubscribe(t *testing.T) {
 			ExactlyOnceDelivery: false,
 			GuaranteedOrder:     false,
 			Persistent:          true,
+			// Currently none of emulators are stable enough to
+			// handle all tests, see: https://github.com/localstack/localstack/issues/2074
+			ForceShort: true,
 		},
 		createPubSub,
 		createPubSubWithConsumerGroup,
@@ -54,6 +57,9 @@ func TestPubSub_arn_topic_resolver(t *testing.T) {
 				GenerateTopicFunc: func(tctx tests.TestContext) string {
 					return fmt.Sprintf("arn:aws:sns:us-west-2:000000000000:%s", tctx.TestID)
 				},
+				// Currently none of emulators are stable enough to
+				// handle all tests, see: https://github.com/localstack/localstack/issues/2074
+				ForceShort: true,
 			},
 		},
 		func(t *testing.T) (message.Publisher, message.Subscriber) {

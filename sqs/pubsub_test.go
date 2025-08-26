@@ -30,6 +30,9 @@ func TestPubSub(t *testing.T) {
 			ExactlyOnceDelivery: false,
 			GuaranteedOrder:     true,
 			Persistent:          true,
+			// Currently none of emulators are stable enough to
+			// handle all tests, see: https://github.com/localstack/localstack/issues/2074
+			ForceShort: true,
 		},
 		createPubSub,
 		createPubSubWithConsumerGroup,
@@ -49,6 +52,9 @@ func TestPublishSubscribe_with_GenerateQueueUrlResolver(t *testing.T) {
 				GuaranteedOrder:                     true,
 				GuaranteedOrderWithSingleSubscriber: true,
 				Persistent:                          true,
+				// Currently none of emulators are stable enough to
+				// handle all tests, see: https://github.com/localstack/localstack/issues/2074
+				ForceShort: true,
 			},
 		},
 		func(t *testing.T) (message.Publisher, message.Subscriber) {
@@ -117,6 +123,9 @@ func TestPublishSubscribe_with_TransparentUrlResolver(t *testing.T) {
 				GenerateTopicFunc: func(tctx tests.TestContext) string {
 					return fmt.Sprintf("http://sqs.us-west-2.localhost.localstack.cloud:4566/000000000000/%s", tctx.TestID)
 				},
+				// Currently none of emulators are stable enough to
+				// handle all tests, see: https://github.com/localstack/localstack/issues/2074
+				ForceShort: true,
 			},
 		},
 		func(t *testing.T) (message.Publisher, message.Subscriber) {
@@ -179,6 +188,9 @@ func TestPublishSubscribe_batching(t *testing.T) {
 				GuaranteedOrder:                     true,
 				GuaranteedOrderWithSingleSubscriber: true,
 				Persistent:                          true,
+				// Currently none of emulators are stable enough to
+				// handle all tests, see: https://github.com/localstack/localstack/issues/2074
+				ForceShort: true,
 			},
 		},
 		func(t *testing.T) (message.Publisher, message.Subscriber) {
