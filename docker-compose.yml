@@ -1,7 +1,7 @@
 services:
   localstack:
     container_name: localstack
-    image: localstack/localstack:3.7.2
+    image: localstack/localstack:3.8
     environment:
       - SERVICES=sqs,sns
       - AWS_DEFAULT_REGION=us-east-1
