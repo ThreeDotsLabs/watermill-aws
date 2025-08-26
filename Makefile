@@ -4,7 +4,7 @@ up:
 	docker compose up -d
 
 test:
-	go test ./... -timeout=20m
+	go test ./...
 
 test_v:
 	go test -v ./...
@@ -13,7 +13,7 @@ test_short:
 	go test ./... -short
 
 test_race:
-	go test ./... -short -race -timeout=30m
+	go test ./... -short -race
 
 test_stress:
 	STRESS_TEST_COUNT=3 go test -tags=stress -timeout=45m ./...

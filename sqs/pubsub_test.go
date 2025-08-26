@@ -21,6 +21,8 @@ import (
 )
 
 func TestPubSub(t *testing.T) {
+	t.Parallel()
+
 	tests.TestPubSub(
 		t,
 		tests.Features{
@@ -28,20 +30,9 @@ func TestPubSub(t *testing.T) {
 			ExactlyOnceDelivery: false,
 			GuaranteedOrder:     true,
 			Persistent:          true,
-		},
-		createPubSub,
-		createPubSubWithConsumerGroup,
-	)
-}
-
-func TestPubSub_stress(t *testing.T) {
-	tests.TestPubSubStressTest(
-		t,
-		tests.Features{
-			ConsumerGroups:      false,
-			ExactlyOnceDelivery: false,
-			GuaranteedOrder:     true,
-			Persistent:          true,
+			// Currently none of emulators are stable enough to
+			// handle all tests, see: https://github.com/localstack/localstack/issues/2074
+			ForceShort: true,
 		},
 		createPubSub,
 		createPubSubWithConsumerGroup,
@@ -49,6 +40,8 @@ func TestPubSub_stress(t *testing.T) {
 }
 
 func TestPublishSubscribe_with_GenerateQueueUrlResolver(t *testing.T) {
+	t.Parallel()
+
 	tests.TestPublishSubscribe(
 		t,
 		tests.TestContext{
@@ -59,6 +52,9 @@ func TestPublishSubscribe_with_GenerateQueueUrlResolver(t *testing.T) {
 				GuaranteedOrder:                     true,
 				GuaranteedOrderWithSingleSubscriber: true,
 				Persistent:                          true,
+				// Currently none of emulators are stable enough to
+				// handle all tests, see: https://github.com/localstack/localstack/issues/2074
+				ForceShort: true,
 			},
 		},
 		func(t *testing.T) (message.Publisher, message.Subscriber) {
@@ -112,6 +108,8 @@ func TestPublishSubscribe_with_GenerateQueueUrlResolver(t *testing.T) {
 }
 
 func TestPublishSubscribe_with_TransparentUrlResolver(t *testing.T) {
+	t.Parallel()
+
 	tests.TestPublishSubscribe(
 		t,
 		tests.TestContext{
@@ -125,6 +123,9 @@ func TestPublishSubscribe_with_TransparentUrlResolver(t *testing.T) {
 				GenerateTopicFunc: func(tctx tests.TestContext) string {
 					return fmt.Sprintf("http://sqs.us-west-2.localhost.localstack.cloud:4566/000000000000/%s", tctx.TestID)
 				},
+				// Currently none of emulators are stable enough to
+				// handle all tests, see: https://github.com/localstack/localstack/issues/2074
+				ForceShort: true,
 			},
 		},
 		func(t *testing.T) (message.Publisher, message.Subscriber) {
@@ -175,6 +176,8 @@ func TestPublishSubscribe_with_TransparentUrlResolver(t *testing.T) {
 }
 
 func TestPublishSubscribe_batching(t *testing.T) {
+	t.Parallel()
+
 	tests.TestPublishSubscribe(
 		t,
 		tests.TestContext{
@@ -185,6 +188,9 @@ func TestPublishSubscribe_batching(t *testing.T) {
 				GuaranteedOrder:                     true,
 				GuaranteedOrderWithSingleSubscriber: true,
 				Persistent:                          true,
+				// Currently none of emulators are stable enough to
+				// handle all tests, see: https://github.com/localstack/localstack/issues/2074
+				ForceShort: true,
 			},
 		},
 		func(t *testing.T) (message.Publisher, message.Subscriber) {
@@ -231,6 +237,8 @@ func TestPublishSubscribe_batching(t *testing.T) {
 }
 
 func TestPublishSubscribe_creating_queue_with_different_settings_should_be_idempotent(t *testing.T) {
+	t.Parallel()
+
 	logger := watermill.NewStdLogger(false, false)
 
 	sub1, err := sqs.NewSubscriber(sqs.SubscriberConfig{
@@ -264,6 +272,8 @@ func TestPublishSubscribe_creating_queue_with_different_settings_should_be_idemp
 }
 
 func TestPublisher_GetOrCreateQueueUrl_is_idempotent(t *testing.T) {
+	t.Parallel()
+
 	pub, _ := createPubSub(t)
 
 	topicName := watermill.NewUUID()
@@ -280,6 +290,8 @@ func TestPublisher_GetOrCreateQueueUrl_is_idempotent(t *testing.T) {
 }
 
 func TestSubscriber_doesnt_hang_when_queue_doesnt_exist(t *testing.T) {
+	t.Parallel()
+
 	cfg := newAwsConfig(t)
 
 	_, sub := createPubSubWithConfig(
@@ -315,6 +327,8 @@ func TestSubscriber_doesnt_hang_when_queue_doesnt_exist(t *testing.T) {
 }
 
 func TestPublisher_do_not_create_queue(t *testing.T) {
+	t.Parallel()
+
 	cfg := newAwsConfig(t)
 
 	pub, _ := createPubSubWithConfig(

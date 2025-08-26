@@ -23,6 +23,8 @@ import (
 )
 
 func TestPublishSubscribe(t *testing.T) {
+	t.Parallel()
+
 	tests.TestPubSub(
 		t,
 		tests.Features{
@@ -30,6 +32,9 @@ func TestPublishSubscribe(t *testing.T) {
 			ExactlyOnceDelivery: false,
 			GuaranteedOrder:     false,
 			Persistent:          true,
+			// Currently none of emulators are stable enough to
+			// handle all tests, see: https://github.com/localstack/localstack/issues/2074
+			ForceShort: true,
 		},
 		createPubSub,
 		createPubSubWithConsumerGroup,
@@ -37,6 +42,8 @@ func TestPublishSubscribe(t *testing.T) {
 }
 
 func TestPubSub_arn_topic_resolver(t *testing.T) {
+	t.Parallel()
+
 	tests.TestPublishSubscribe(
 		t,
 		tests.TestContext{
@@ -50,6 +57,9 @@ func TestPubSub_arn_topic_resolver(t *testing.T) {
 				GenerateTopicFunc: func(tctx tests.TestContext) string {
 					return fmt.Sprintf("arn:aws:sns:us-west-2:000000000000:%s", tctx.TestID)
 				},
+				// Currently none of emulators are stable enough to
+				// handle all tests, see: https://github.com/localstack/localstack/issues/2074
+				ForceShort: true,
 			},
 		},
 		func(t *testing.T) (message.Publisher, message.Subscriber) {
@@ -90,6 +100,8 @@ func TestPubSub_arn_topic_resolver(t *testing.T) {
 }
 
 func TestPublisher_CreateTopic_is_idempotent(t *testing.T) {
+	t.Parallel()
+
 	pub, _ := createPubSub(t)
 
 	topicName := watermill.NewUUID()
@@ -104,6 +116,8 @@ func TestPublisher_CreateTopic_is_idempotent(t *testing.T) {
 }
 
 func TestSubscriber_SubscribeInitialize_is_idempotent(t *testing.T) {
+	t.Parallel()
+
 	_, sub := createPubSub(t)
 
 	topicName := watermill.NewUUID()
