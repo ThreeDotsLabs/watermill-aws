@@ -23,6 +23,8 @@ import (
 )
 
 func TestPublishSubscribe(t *testing.T) {
+	t.Parallel()
+
 	tests.TestPubSub(
 		t,
 		tests.Features{
@@ -37,6 +39,8 @@ func TestPublishSubscribe(t *testing.T) {
 }
 
 func TestPubSub_arn_topic_resolver(t *testing.T) {
+	t.Parallel()
+
 	tests.TestPublishSubscribe(
 		t,
 		tests.TestContext{
@@ -90,6 +94,8 @@ func TestPubSub_arn_topic_resolver(t *testing.T) {
 }
 
 func TestPublisher_CreateTopic_is_idempotent(t *testing.T) {
+	t.Parallel()
+
 	pub, _ := createPubSub(t)
 
 	topicName := watermill.NewUUID()
@@ -104,6 +110,8 @@ func TestPublisher_CreateTopic_is_idempotent(t *testing.T) {
 }
 
 func TestSubscriber_SubscribeInitialize_is_idempotent(t *testing.T) {
+	t.Parallel()
+
 	_, sub := createPubSub(t)
 
 	topicName := watermill.NewUUID()
