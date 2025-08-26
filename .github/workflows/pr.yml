@@ -7,4 +7,4 @@ jobs:
   ci:
     uses: ThreeDotsLabs/watermill/.github/workflows/tests.yml@master
     with:
-      runs-on: ubuntu-latest-4core
+      runs-on: ubuntu-latest-8core
