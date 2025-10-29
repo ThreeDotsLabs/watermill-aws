@@ -186,12 +186,31 @@ type TransparentUrlResolver struct{}
 func (p TransparentUrlResolver) ResolveQueueUrl(ctx context.Context, params ResolveQueueUrlParams) (res QueueUrlResolverResult, err error) {
 	topicParts := strings.Split(params.Topic, "/")
 	queueName := topicParts[len(topicParts)-1]
+	queueOwnerAwsAccountId := topicParts[len(topicParts)-2]
 
-	queueURL := QueueURL(params.Topic)
+	var exists bool
 
-	return QueueUrlResolverResult{
-		QueueName: QueueName(queueName),
-		QueueURL:  &queueURL, // in this case topic maps to queue URL
-		Exists:    nil,       // we don't know
-	}, nil
+	queueUrl, err := getQueueUrl(ctx, params.SqsClient, params.Topic, &sqs.GetQueueUrlInput{
+		QueueName:              aws.String(queueName),
+		QueueOwnerAWSAccountId: aws.String(queueOwnerAwsAccountId),
+	})
+	if err == nil {
+		exists = true
+		return QueueUrlResolverResult{
+			QueueName: QueueName(queueName),
+			QueueURL:  queueUrl,
+			Exists:    &exists,
+		}, nil
+	}
+	var queueDoesNotExistsErr *types.QueueDoesNotExist
+	if errors.As(err, &queueDoesNotExistsErr) {
+		exists = false
+		return QueueUrlResolverResult{
+			QueueName: QueueName(queueName),
+			QueueURL:  queueUrl,
+			Exists:    &exists,
+		}, nil
+	}
+
+	return QueueUrlResolverResult{}, err
 }
