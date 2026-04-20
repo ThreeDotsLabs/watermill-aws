@@ -7,14 +7,17 @@ import (
 
 	"github.com/ThreeDotsLabs/watermill"
 	"github.com/ThreeDotsLabs/watermill/message"
+	"github.com/aws/aws-sdk-go-v2/service/s3"
 	"github.com/aws/aws-sdk-go-v2/service/sqs"
 	"github.com/aws/aws-sdk-go-v2/service/sqs/types"
+
+	sqsextendedclient "github.com/Aryon-Security/watermill-aws/extended-client/sqs"
 )
 
 type Publisher struct {
 	config PublisherConfig
 	logger watermill.LoggerAdapter
-	sqs    *sqs.Client
+	sqs    sqsextendedclient.SQSClient
 }
 
 func NewPublisher(config PublisherConfig, logger watermill.LoggerAdapter) (*Publisher, error) {
@@ -24,8 +27,15 @@ func NewPublisher(config PublisherConfig, logger watermill.LoggerAdapter) (*Publ
 		return nil, err
 	}
 
+	sqsClient := sqs.NewFromConfig(config.AWSConfig, config.SQSOptFns...)
+	s3Client := s3.NewFromConfig(config.AWSConfig, config.S3OptsFns...)
+	extendedSQSClient, err := sqsextendedclient.New(sqsClient, s3Client, config.ExtendedSQSOpts...)
+	if err != nil {
+		return nil, fmt.Errorf("cannot create extended SQS client: %w", err)
+	}
+
 	return &Publisher{
-		sqs:    sqs.NewFromConfig(config.AWSConfig, config.OptFns...),
+		sqs:    extendedSQSClient,
 		config: config,
 		logger: logger,
 	}, nil

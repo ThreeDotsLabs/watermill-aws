@@ -3,8 +3,9 @@ package sqs_test
 import (
 	"testing"
 
-	"github.com/ThreeDotsLabs/watermill-aws/sqs"
 	"github.com/stretchr/testify/require"
+
+	"github.com/Aryon-Security/watermill-aws/sqs"
 )
 
 func TestSubscriberConfig_SetDefaults_ConsumeWorkers(t *testing.T) {

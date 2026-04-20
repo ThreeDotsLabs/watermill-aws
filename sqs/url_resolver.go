@@ -12,6 +12,8 @@ import (
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/sqs"
 	"github.com/aws/aws-sdk-go-v2/service/sqs/types"
+
+	sqsextendedclient "github.com/Aryon-Security/watermill-aws/extended-client/sqs"
 )
 
 // QueueUrlResolver resolves queue URL by topic passed to Publisher.Publish, Subscriber.Subscribe.
@@ -23,7 +25,7 @@ type ResolveQueueUrlParams struct {
 	// Topic passed to Publisher.Publish, Subscriber.Subscribe, etc.
 	// It may be mapped to a different name by QueueUrlResolver.
 	Topic     string
-	SqsClient *sqs.Client
+	SqsClient sqsextendedclient.SQSClient
 	Logger    watermill.LoggerAdapter
 }
 

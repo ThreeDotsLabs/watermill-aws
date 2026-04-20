@@ -3,6 +3,7 @@ package sqs
 import (
 	"context"
 
+	"github.com/aws/aws-sdk-go-v2/service/s3"
 	"github.com/aws/aws-sdk-go-v2/service/sqs"
 	"github.com/aws/smithy-go/endpoints"
 )
@@ -13,7 +14,7 @@ import (
 // For example:
 // import (
 //
-//	"github.com/ThreeDotsLabs/watermill-aws/sqs"
+//	"github.com/Aryon-Security/watermill-aws/sqs"
 //	amazonsqs "github.com/aws/aws-sdk-go-v2/service/sqs"
 //	"github.com/aws/smithy-go/transport"
 //
@@ -22,7 +23,7 @@ import (
 //	pub, err := sqs.NewPublisher(sqs.PublisherConfig{
 //			AWSConfig: cfg,
 //			Marshaler: sqs.DefaultMarshalerUnmarshaler{},
-//			OptFns: []func(*amazonsqs.Options){
+//			SNSOptFns: []func(*amazonsqs.Options){
 //				amazonsqs.WithEndpointResolverV2(sqs.OverrideEndpointResolver{
 //					Endpoint: transport.Endpoint{
 //						URI: url.URL{Scheme: "http", Host: "localstack:4566"},
@@ -34,6 +35,14 @@ type OverrideEndpointResolver struct {
 	Endpoint transport.Endpoint
 }
 
-func (o OverrideEndpointResolver) ResolveEndpoint(ctx context.Context, params sqs.EndpointParameters) (transport.Endpoint, error) {
+func (o OverrideEndpointResolver) ResolveEndpoint(context.Context, sqs.EndpointParameters) (transport.Endpoint, error) {
+	return o.Endpoint, nil
+}
+
+type S3OverrideEndpointResolver struct {
+	Endpoint transport.Endpoint
+}
+
+func (o S3OverrideEndpointResolver) ResolveEndpoint(context.Context, s3.EndpointParameters) (transport.Endpoint, error) {
 	return o.Endpoint, nil
 }

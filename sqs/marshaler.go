@@ -1,6 +1,8 @@
 package sqs
 
 import (
+	"unsafe"
+
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/sqs/types"
 
@@ -35,7 +37,7 @@ func (d DefaultMarshalerUnmarshaler) Marshal(msg *message.Message) (*types.Messa
 }
 
 func (d DefaultMarshalerUnmarshaler) Unmarshal(msg *types.Message) (*message.Message, error) {
-	var uuid, payload string
+	var uuid string
 	attributes := attributesToMetadata(msg.MessageAttributes)
 	if value, ok := msg.MessageAttributes[UUIDAttribute]; ok {
 		uuid = *value.StringValue
@@ -45,11 +47,19 @@ func (d DefaultMarshalerUnmarshaler) Unmarshal(msg *types.Message) (*message.Mes
 		uuid = *msg.MessageId
 	}
 
+	var wmsg *message.Message
 	if msg.Body != nil {
-		payload = *msg.Body
+		// Get the string value without copying the data(This does make a copy of the string header (which is small - just 16 bytes), but not the underlying string data)
+		bodyStr := *msg.Body
+		// Create a byte slice that shares the same underlying memory as the string
+		// This avoids making a copy of the data
+		byteSlice := unsafe.Slice(unsafe.StringData(bodyStr), len(bodyStr))
+
+		wmsg = message.NewMessage(uuid, byteSlice)
+	} else {
+		wmsg = message.NewMessage(uuid, nil)
 	}
 
-	wmsg := message.NewMessage(uuid, []byte(payload))
 	wmsg.Metadata = attributes
 
 	return wmsg, nil

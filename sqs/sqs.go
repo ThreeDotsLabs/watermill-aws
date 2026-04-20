@@ -7,6 +7,8 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/sqs"
 	"github.com/aws/aws-sdk-go-v2/service/sqs/types"
 	"github.com/pkg/errors"
+
+	sqsextendedclient "github.com/Aryon-Security/watermill-aws/extended-client/sqs"
 )
 
 // QueueURL is a URL of the queue.
@@ -18,7 +20,7 @@ type QueueName string
 // QueueArn is an ARN of the queue.
 type QueueArn string
 
-func getQueueUrl(ctx context.Context, sqsClient *sqs.Client, topic string, input *sqs.GetQueueUrlInput) (*QueueURL, error) {
+func getQueueUrl(ctx context.Context, sqsClient sqsextendedclient.SQSClient, topic string, input *sqs.GetQueueUrlInput) (*QueueURL, error) {
 	getQueueOutput, err := sqsClient.GetQueueUrl(ctx, input)
 
 	if err != nil || getQueueOutput.QueueUrl == nil {
@@ -32,7 +34,7 @@ func getQueueUrl(ctx context.Context, sqsClient *sqs.Client, topic string, input
 
 func createQueue(
 	ctx context.Context,
-	sqsClient *sqs.Client,
+	sqsClient sqsextendedclient.SQSClient,
 	createQueueParams *sqs.CreateQueueInput,
 ) (*QueueURL, error) {
 	createQueueOutput, err := sqsClient.CreateQueue(ctx, createQueueParams)
@@ -56,7 +58,7 @@ func createQueue(
 	return &queueURL, nil
 }
 
-func getARNUrl(ctx context.Context, sqsClient *sqs.Client, url *QueueURL) (*QueueArn, error) {
+func getARNUrl(ctx context.Context, sqsClient sqsextendedclient.SQSClient, url *QueueURL) (*QueueArn, error) {
 	if url == nil {
 		return nil, fmt.Errorf("queue URL is nil")
 	}

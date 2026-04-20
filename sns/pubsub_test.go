@@ -5,10 +5,12 @@ import (
 	"fmt"
 	"net/url"
 	"testing"
+	"time"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	awsconfig "github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/credentials"
+	amazons3 "github.com/aws/aws-sdk-go-v2/service/s3"
 	amazonsns "github.com/aws/aws-sdk-go-v2/service/sns"
 	amazonsqs "github.com/aws/aws-sdk-go-v2/service/sqs"
 	transport "github.com/aws/smithy-go/endpoints"
@@ -16,10 +18,12 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/ThreeDotsLabs/watermill"
-	"github.com/ThreeDotsLabs/watermill-aws/sns"
-	"github.com/ThreeDotsLabs/watermill-aws/sqs"
 	"github.com/ThreeDotsLabs/watermill/message"
 	"github.com/ThreeDotsLabs/watermill/pubsub/tests"
+
+	"github.com/Aryon-Security/watermill-aws/sqs"
+
+	"github.com/Aryon-Security/watermill-aws/sns"
 )
 
 func TestPublishSubscribe(t *testing.T) {
@@ -68,27 +72,24 @@ func TestPubSub_arn_topic_resolver(t *testing.T) {
 			return createPubSubWithConfig(
 				t,
 				sns.PublisherConfig{
-					AWSConfig: cfg,
-					OptFns: []func(*amazonsns.Options){
-						GetEndpointResolverSns(),
-					},
+					AWSConfig:         cfg,
+					SNSOptFns:         GetEndpointResolverSns(),
 					CreateTopicConfig: sns.ConfigAttributes{},
 					Marshaler:         sns.DefaultMarshalerUnmarshaler{},
 					TopicResolver:     sns.TransparentTopicResolver{},
 				},
 				sns.SubscriberConfig{
-					AWSConfig: cfg,
-					OptFns: []func(*amazonsns.Options){
-						GetEndpointResolverSns(),
-					},
+					AWSConfig:            cfg,
+					SNSOptFns:            GetEndpointResolverSns(),
 					GenerateSqsQueueName: sns.GenerateSqsQueueNameEqualToTopicName,
 					TopicResolver:        sns.TransparentTopicResolver{},
+					// Add delay for subscription propagation in CI/localstack
+					SubscriptionPropagationDelay: 10000 * time.Millisecond,
 				},
 				sqs.SubscriberConfig{
 					AWSConfig: cfg,
-					OptFns: []func(*amazonsqs.Options){
-						GetEndpointResolverSqs(),
-					},
+					SQSOptFns: GetEndpointResolverSqs(),
+					S3OptsFns: GetEndpointResolverS3(),
 					QueueConfigAttributes: sqs.QueueConfigAttributes{
 						// Default value is 30 seconds - need to be lower for tests
 						VisibilityTimeout: "1",
@@ -138,27 +139,22 @@ func createPubSub(t *testing.T) (message.Publisher, message.Subscriber) {
 	return createPubSubWithConfig(
 		t,
 		sns.PublisherConfig{
-			AWSConfig: cfg,
-			OptFns: []func(*amazonsns.Options){
-				GetEndpointResolverSns(),
-			},
+			AWSConfig:         cfg,
+			SNSOptFns:         GetEndpointResolverSns(),
 			CreateTopicConfig: sns.ConfigAttributes{},
 			TopicResolver:     topicResolver,
 			Marshaler:         sns.DefaultMarshalerUnmarshaler{},
 		},
 		sns.SubscriberConfig{
-			AWSConfig: cfg,
-			OptFns: []func(*amazonsns.Options){
-				GetEndpointResolverSns(),
-			},
+			AWSConfig:            cfg,
+			SNSOptFns:            GetEndpointResolverSns(),
 			TopicResolver:        topicResolver,
 			GenerateSqsQueueName: sns.GenerateSqsQueueNameEqualToTopicName,
 		},
 		sqs.SubscriberConfig{
 			AWSConfig: cfg,
-			OptFns: []func(*amazonsqs.Options){
-				GetEndpointResolverSqs(),
-			},
+			SQSOptFns: GetEndpointResolverSqs(),
+			S3OptsFns: GetEndpointResolverS3(),
 			QueueConfigAttributes: sqs.QueueConfigAttributes{
 				// Default value is 30 seconds - need to be lower for tests
 				VisibilityTimeout: "1",
@@ -176,19 +172,15 @@ func createPubSubWithConsumerGroup(t *testing.T, consumerGroup string) (message.
 	return createPubSubWithConfig(
 		t,
 		sns.PublisherConfig{
-			AWSConfig: cfg,
-			OptFns: []func(*amazonsns.Options){
-				GetEndpointResolverSns(),
-			},
+			AWSConfig:         cfg,
+			SNSOptFns:         GetEndpointResolverSns(),
 			CreateTopicConfig: sns.ConfigAttributes{},
 			Marshaler:         sns.DefaultMarshalerUnmarshaler{},
 			TopicResolver:     topicResolver,
 		},
 		sns.SubscriberConfig{
 			AWSConfig: cfg,
-			OptFns: []func(*amazonsns.Options){
-				GetEndpointResolverSns(),
-			},
+			SNSOptFns: GetEndpointResolverSns(),
 			GenerateSqsQueueName: func(ctx context.Context, sqsTopic sns.TopicArn) (string, error) {
 				return consumerGroup, nil
 			},
@@ -196,9 +188,8 @@ func createPubSubWithConsumerGroup(t *testing.T, consumerGroup string) (message.
 		},
 		sqs.SubscriberConfig{
 			AWSConfig: cfg,
-			OptFns: []func(*amazonsqs.Options){
-				GetEndpointResolverSqs(),
-			},
+			SQSOptFns: GetEndpointResolverSqs(),
+			S3OptsFns: GetEndpointResolverS3(),
 			QueueConfigAttributes: sqs.QueueConfigAttributes{
 				// Default value is 30 seconds - need to be lower for tests
 				VisibilityTimeout: "1",
@@ -242,18 +233,35 @@ func GetAWSConfig(t *testing.T) aws.Config {
 	return cfg
 }
 
-func GetEndpointResolverSns() func(*amazonsns.Options) {
-	return amazonsns.WithEndpointResolverV2(sns.OverrideEndpointResolver{
-		Endpoint: transport.Endpoint{
-			URI: url.URL{Scheme: "http", Host: "localhost:4566"},
-		},
-	})
+func GetEndpointResolverSns() []func(*amazonsns.Options) {
+	return []func(*amazonsns.Options){
+		amazonsns.WithEndpointResolverV2(sns.OverrideEndpointResolver{
+			Endpoint: transport.Endpoint{
+				URI: url.URL{Scheme: "http", Host: "localhost:4566"},
+			},
+		}),
+	}
 }
 
-func GetEndpointResolverSqs() func(*amazonsqs.Options) {
-	return amazonsqs.WithEndpointResolverV2(sqs.OverrideEndpointResolver{
-		Endpoint: transport.Endpoint{
-			URI: url.URL{Scheme: "http", Host: "localhost:4566"},
+func GetEndpointResolverSqs() []func(*amazonsqs.Options) {
+	return []func(*amazonsqs.Options){
+		amazonsqs.WithEndpointResolverV2(sqs.OverrideEndpointResolver{
+			Endpoint: transport.Endpoint{
+				URI: url.URL{Scheme: "http", Host: "localhost:4566"},
+			},
+		}),
+	}
+}
+
+func GetEndpointResolverS3() []func(*amazons3.Options) {
+	return []func(*amazons3.Options){
+		amazons3.WithEndpointResolverV2(sqs.S3OverrideEndpointResolver{
+			Endpoint: transport.Endpoint{
+				URI: url.URL{Scheme: "http", Host: "localhost:4566"},
+			},
+		}),
+		func(options *amazons3.Options) {
+			options.UsePathStyle = true
 		},
-	})
+	}
 }

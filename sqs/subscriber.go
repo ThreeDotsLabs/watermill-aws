@@ -9,15 +9,18 @@ import (
 
 	"github.com/ThreeDotsLabs/watermill"
 	"github.com/ThreeDotsLabs/watermill/message"
+	"github.com/aws/aws-sdk-go-v2/service/s3"
 	"github.com/aws/aws-sdk-go-v2/service/sqs"
 	"github.com/aws/aws-sdk-go-v2/service/sqs/types"
 	"github.com/aws/smithy-go"
+
+	sqsextendedclient "github.com/Aryon-Security/watermill-aws/extended-client/sqs"
 )
 
 type Subscriber struct {
 	config SubscriberConfig
 	logger watermill.LoggerAdapter
-	sqs    *sqs.Client
+	sqs    sqsextendedclient.SQSClient
 
 	closing       chan struct{}
 	subscribersWg sync.WaitGroup
@@ -39,13 +42,23 @@ func NewSubscriber(config SubscriberConfig, logger watermill.LoggerAdapter) (*Su
 	logger = logger.With(watermill.LogFields{
 		"subscriber_uuid": watermill.NewShortUUID(),
 	})
+	sqsClient := sqs.NewFromConfig(config.AWSConfig, config.SQSOptFns...)
+	s3Client := s3.NewFromConfig(config.AWSConfig, config.S3OptsFns...)
+	extendedSQSClient, err := sqsextendedclient.New(sqsClient, s3Client, config.ExtendedSQSOpts...)
+	if err != nil {
+		return nil, fmt.Errorf("cannot create extended SQS client: %w", err)
+	}
 
 	return &Subscriber{
 		config:  config,
 		logger:  logger,
-		sqs:     sqs.NewFromConfig(config.AWSConfig, config.OptFns...),
+		sqs:     extendedSQSClient,
 		closing: make(chan struct{}),
 	}, nil
+}
+
+func (s *Subscriber) GetClient() sqsextendedclient.SQSClient {
+	return s.sqs
 }
 
 func (s *Subscriber) Subscribe(ctx context.Context, topic string) (<-chan *message.Message, error) {
@@ -322,6 +335,14 @@ func (s *Subscriber) SubscribeInitializeWithContext(ctx context.Context, topic s
 	_, err = createQueue(ctx, s.sqs, input)
 	if err != nil {
 		return fmt.Errorf("cannot create queue %s: %w", topic, err)
+	}
+
+	// Wait for queue to propagate if configured
+	if s.config.QueuePropagationDelay > 0 {
+		logger.Debug("Waiting for queue to propagate", watermill.LogFields{
+			"delay": s.config.QueuePropagationDelay.String(),
+		})
+		time.Sleep(s.config.QueuePropagationDelay)
 	}
 
 	return nil

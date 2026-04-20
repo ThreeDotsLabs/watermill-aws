@@ -5,18 +5,28 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"time"
 
-	"github.com/ThreeDotsLabs/watermill-aws/sqs"
 	"github.com/aws/aws-sdk-go-v2/aws"
+	"github.com/aws/aws-sdk-go-v2/service/s3"
 	"github.com/aws/aws-sdk-go-v2/service/sns"
+
+	snsextendedclient "github.com/Aryon-Security/watermill-aws/extended-client/sns"
+	"github.com/Aryon-Security/watermill-aws/sqs"
 )
 
 type PublisherConfig struct {
 	// AWSConfig is the AWS configuration.
 	AWSConfig aws.Config
 
-	// OptFns are options for the SNS client.
-	OptFns []func(*sns.Options)
+	// SNSOptFns are options for the SNS client.
+	SNSOptFns []func(*sns.Options)
+
+	// S3OptsFns are options for the S3 client.
+	S3OptsFns []func(*s3.Options)
+
+	// ExtendedSNSOpts are options for the SNS extended client.
+	ExtendedSNSOpts []snsextendedclient.ClientOption
 
 	// ConfigAttributes is a struct that holds the attributes of an SNS topic.
 	CreateTopicConfig ConfigAttributes
@@ -75,8 +85,14 @@ type SubscriberConfig struct {
 	// AWSConfig is the AWS configuration.
 	AWSConfig aws.Config
 
-	// OptFns are options for the SNS client.
-	OptFns []func(*sns.Options)
+	// SNSOptFns are options for the SNS client.
+	SNSOptFns []func(*sns.Options)
+
+	// S3OptsFns are options for the S3 client.
+	S3OptsFns []func(*s3.Options)
+
+	// ExtendedSNSOpts are options for the SNS extended client.
+	ExtendedSNSOpts []snsextendedclient.ClientOption
 
 	// TopicResolver is a function that resolves the topic name to the topic ARN.
 	TopicResolver TopicResolver
@@ -97,6 +113,11 @@ type SubscriberConfig struct {
 	// Described in AWS docs: https://docs.aws.amazon.com/sns/latest/dg/subscribe-sqs-queue-to-sns-topic.html#SendMessageToSQS.sqs.permissions
 	// Creating access policy requires "sqs:SetQueueAttributes" permission.
 	DoNotSetQueueAccessPolicy bool
+
+	// SubscriptionPropagationDelay is the time to wait after creating a subscription
+	// to allow it to propagate. This is useful for localstack or other test environments
+	// where subscriptions may not be immediately active. Set to 0 to disable (default).
+	SubscriptionPropagationDelay time.Duration
 }
 
 func (c *SubscriberConfig) SetDefaults() {

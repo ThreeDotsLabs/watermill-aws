@@ -7,6 +7,8 @@ import (
 	"strings"
 
 	"github.com/aws/aws-sdk-go-v2/service/sns"
+
+	snsextendedclient "github.com/Aryon-Security/watermill-aws/extended-client/sns"
 )
 
 // TopicName is a name of the SNS topic
@@ -15,7 +17,7 @@ type TopicName string
 // TopicArn is an ARN of the SNS topic
 type TopicArn string
 
-func createSnsTopic(ctx context.Context, snsClient *sns.Client, createSNSParams sns.CreateTopicInput) (*string, error) {
+func createSnsTopic(ctx context.Context, snsClient snsextendedclient.SNSClient, createSNSParams sns.CreateTopicInput) (*string, error) {
 	createSNSOutput, err := snsClient.CreateTopic(ctx, &createSNSParams)
 	if err != nil || createSNSOutput.TopicArn == nil {
 		return nil, fmt.Errorf("cannot create SNS topic %s: %w", *createSNSParams.Name, err)

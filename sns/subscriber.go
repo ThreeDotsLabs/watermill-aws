@@ -4,22 +4,25 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"time"
 
 	"github.com/ThreeDotsLabs/watermill"
-	"github.com/ThreeDotsLabs/watermill-aws/sqs"
 	"github.com/ThreeDotsLabs/watermill/message"
 	"github.com/aws/aws-sdk-go-v2/aws"
+	"github.com/aws/aws-sdk-go-v2/service/s3"
 	"github.com/aws/aws-sdk-go-v2/service/sns"
 	awsSqs "github.com/aws/aws-sdk-go-v2/service/sqs"
+
+	snsextendedclient "github.com/Aryon-Security/watermill-aws/extended-client/sns"
+	"github.com/Aryon-Security/watermill-aws/sqs"
 )
 
 type Subscriber struct {
 	config SubscriberConfig
 	logger watermill.LoggerAdapter
 
-	sns       *sns.Client
-	sqs       *sqs.Subscriber
-	sqsClient *awsSqs.Client
+	sns snsextendedclient.SNSClient
+	sqs *sqs.Subscriber
 }
 
 func NewSubscriber(
@@ -45,12 +48,18 @@ func NewSubscriber(
 		return nil, fmt.Errorf("cannot create SQS subscriber: %w", err)
 	}
 
+	snsClient := sns.NewFromConfig(config.AWSConfig, config.SNSOptFns...)
+	s3Client := s3.NewFromConfig(config.AWSConfig, config.S3OptsFns...)
+	extendedSnsClient, err := snsextendedclient.New(snsClient, s3Client, config.ExtendedSNSOpts...)
+	if err != nil {
+		return nil, fmt.Errorf("cannot create extended SQS client: %w", err)
+	}
+
 	return &Subscriber{
-		config:    config,
-		logger:    logger,
-		sns:       sns.NewFromConfig(config.AWSConfig, config.OptFns...),
-		sqsClient: awsSqs.NewFromConfig(sqsConfig.AWSConfig, sqsConfig.OptFns...),
-		sqs:       sqs,
+		config: config,
+		logger: logger,
+		sns:    extendedSnsClient,
+		sqs:    sqs,
 	}, nil
 }
 
@@ -148,6 +157,14 @@ func (s *Subscriber) SubscribeInitializeWithContext(ctx context.Context, topic s
 		return fmt.Errorf("cannot subscribe to SNS[%s] from %s: %w", snsTopicArn, *sqsQueueArn, err)
 	}
 
+	// Wait for subscription to propagate if configured
+	if s.config.SubscriptionPropagationDelay > 0 {
+		s.logger.Debug("Waiting for subscription to propagate", watermill.LogFields{
+			"delay": s.config.SubscriptionPropagationDelay.String(),
+		})
+		time.Sleep(s.config.SubscriptionPropagationDelay)
+	}
+
 	return nil
 }
 
@@ -170,7 +187,7 @@ func (s *Subscriber) setSqsQueuePolicy(ctx context.Context, sqsQueueArn sqs.Queu
 		"policy": string(policyJSON),
 	})
 
-	_, err = s.sqsClient.SetQueueAttributes(ctx, &awsSqs.SetQueueAttributesInput{
+	_, err = s.sqs.GetClient().SetQueueAttributes(ctx, &awsSqs.SetQueueAttributesInput{
 		QueueUrl: aws.String(string(sqsURL)),
 		Attributes: map[string]string{
 			"Policy": string(policyJSON),

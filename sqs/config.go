@@ -8,16 +8,26 @@ import (
 	"time"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
+	"github.com/aws/aws-sdk-go-v2/service/s3"
 	"github.com/aws/aws-sdk-go-v2/service/sqs"
 	"github.com/aws/aws-sdk-go-v2/service/sqs/types"
+
+	"github.com/Aryon-Security/watermill-aws/consts"
+	sqsextendedclient "github.com/Aryon-Security/watermill-aws/extended-client/sqs"
 )
 
 type SubscriberConfig struct {
 	// AWSConfig is the AWS configuration.
 	AWSConfig aws.Config
 
-	// OptFns are options for the SQS client.
-	OptFns []func(*sqs.Options)
+	// SQSOptFns are options for the SQS client.
+	SQSOptFns []func(*sqs.Options)
+
+	// S3OptsFns are options for the S3 client.
+	S3OptsFns []func(*s3.Options)
+
+	// SQSExtendedSQSOpts are options for the SQS extended client.
+	ExtendedSQSOpts []sqsextendedclient.ClientOption
 
 	// DoNotCreateQueueIfNotExists disables creating the queue if it does not exist.
 	DoNotCreateQueueIfNotExists bool
@@ -46,6 +56,11 @@ type SubscriberConfig struct {
 	ConsumeWorkers int
 
 	Unmarshaler Unmarshaler
+
+	// QueuePropagationDelay is the time to wait after creating a queue
+	// to allow it to propagate. This is useful for localstack or other test environments
+	// where queues may not be immediately ready. Set to 0 to disable (default).
+	QueuePropagationDelay time.Duration
 }
 
 func (c *SubscriberConfig) SetDefaults() {
@@ -83,7 +98,6 @@ func (c SubscriberConfig) Validate() error {
 
 	if c.AWSConfig.Credentials == nil {
 		err = errors.Join(err, errors.New("missing Config.Credentials"))
-
 	}
 	if c.Unmarshaler == nil {
 		err = errors.Join(err, errors.New("missing Config.Marshaler"))
@@ -99,8 +113,14 @@ type PublisherConfig struct {
 	// AWSConfig is the AWS configuration.
 	AWSConfig aws.Config
 
-	// OptFns are options for the SQS client.
-	OptFns []func(*sqs.Options)
+	// SQSOptFns are options for the SQS client.
+	SQSOptFns []func(*sqs.Options)
+
+	// S3OptsFns are options for the S3 client.
+	S3OptsFns []func(*s3.Options)
+
+	// SQSExtendedSQSOpts are options for the SQS extended client.
+	ExtendedSQSOpts []sqsextendedclient.ClientOption
 
 	// QueueConfigAttributes is a struct that holds the attributes of an SQS queue.
 	CreateQueueConfig QueueConfigAttributes
@@ -187,11 +207,24 @@ type GenerateSendMessageInputFunc func(ctx context.Context, queueURL QueueURL, m
 func GenerateSendMessageInputDefault(ctx context.Context, queueURL QueueURL, msg *types.Message) (*sqs.SendMessageInput, error) {
 	urlStr := string(queueURL)
 
-	return &sqs.SendMessageInput{
+	input := &sqs.SendMessageInput{
 		QueueUrl:          &urlStr,
 		MessageAttributes: msg.MessageAttributes,
 		MessageBody:       msg.Body,
-	}, nil
+	}
+
+	// Extract MessageGroupId from message attributes if present
+	// This supports both FIFO queues (strict ordering) and standard queues (fair queuing)
+	if msg.MessageAttributes != nil {
+		if messageGroupID, ok := msg.MessageAttributes[consts.MessageGroupIDMetadataKey]; ok && messageGroupID.StringValue != nil {
+			input.MessageGroupId = messageGroupID.StringValue
+			// Remove from attributes since it's now in the input field
+			delete(msg.MessageAttributes, consts.MessageGroupIDMetadataKey)
+
+		}
+	}
+
+	return input, nil
 }
 
 // QueueConfigAttributes is a struct that holds the attributes of an SQS queue.

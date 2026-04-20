@@ -5,19 +5,21 @@ import (
 	"fmt"
 	"net/url"
 	"testing"
+	"time"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	awsconfig "github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/credentials"
+	amazons3 "github.com/aws/aws-sdk-go-v2/service/s3"
 	amazonsqs "github.com/aws/aws-sdk-go-v2/service/sqs"
-	awssqs "github.com/aws/aws-sdk-go-v2/service/sqs"
 	transport "github.com/aws/smithy-go/endpoints"
 	"github.com/stretchr/testify/require"
 
 	"github.com/ThreeDotsLabs/watermill"
-	"github.com/ThreeDotsLabs/watermill-aws/sqs"
 	"github.com/ThreeDotsLabs/watermill/message"
 	"github.com/ThreeDotsLabs/watermill/pubsub/tests"
+
+	"github.com/Aryon-Security/watermill-aws/sqs"
 )
 
 func TestPubSub(t *testing.T) {
@@ -69,9 +71,8 @@ func TestPublishSubscribe_with_GenerateQueueUrlResolver(t *testing.T) {
 				t,
 				sqs.PublisherConfig{
 					AWSConfig: cfg,
-					OptFns: []func(*amazonsqs.Options){
-						GetEndpointResolverSqs(),
-					},
+					SQSOptFns: GetEndpointResolverSqs(),
+					S3OptsFns: GetEndpointResolverS3(),
 					CreateQueueConfig: sqs.QueueConfigAttributes{
 						// Default value is 30 seconds - need to be lower for tests
 						VisibilityTimeout: "1",
@@ -81,14 +82,13 @@ func TestPublishSubscribe_with_GenerateQueueUrlResolver(t *testing.T) {
 				},
 				sqs.SubscriberConfig{
 					AWSConfig: cfg,
-					OptFns: []func(*amazonsqs.Options){
-						GetEndpointResolverSqs(),
-					},
+					SQSOptFns: GetEndpointResolverSqs(),
+					S3OptsFns: GetEndpointResolverS3(),
 					QueueConfigAttributes: sqs.QueueConfigAttributes{
 						// Default value is 30 seconds - need to be lower for tests
 						VisibilityTimeout: "1",
 					},
-					GenerateReceiveMessageInput: func(ctx context.Context, queueURL sqs.QueueURL) (*awssqs.ReceiveMessageInput, error) {
+					GenerateReceiveMessageInput: func(ctx context.Context, queueURL sqs.QueueURL) (*amazonsqs.ReceiveMessageInput, error) {
 						in, err := sqs.GenerateReceiveMessageInputDefault(ctx, queueURL)
 						if err != nil {
 							return nil, err
@@ -137,9 +137,8 @@ func TestPublishSubscribe_with_TransparentUrlResolver(t *testing.T) {
 				t,
 				sqs.PublisherConfig{
 					AWSConfig: cfg,
-					OptFns: []func(*amazonsqs.Options){
-						GetEndpointResolverSqs(),
-					},
+					SQSOptFns: GetEndpointResolverSqs(),
+					S3OptsFns: GetEndpointResolverS3(),
 					CreateQueueConfig: sqs.QueueConfigAttributes{
 						// Default value is 30 seconds - need to be lower for tests
 						VisibilityTimeout: "1",
@@ -149,14 +148,13 @@ func TestPublishSubscribe_with_TransparentUrlResolver(t *testing.T) {
 				},
 				sqs.SubscriberConfig{
 					AWSConfig: cfg,
-					OptFns: []func(*amazonsqs.Options){
-						GetEndpointResolverSqs(),
-					},
+					SQSOptFns: GetEndpointResolverSqs(),
+					S3OptsFns: GetEndpointResolverS3(),
 					QueueConfigAttributes: sqs.QueueConfigAttributes{
 						// Default value is 30 seconds - need to be lower for tests
 						VisibilityTimeout: "1",
 					},
-					GenerateReceiveMessageInput: func(ctx context.Context, queueURL sqs.QueueURL) (*awssqs.ReceiveMessageInput, error) {
+					GenerateReceiveMessageInput: func(ctx context.Context, queueURL sqs.QueueURL) (*amazonsqs.ReceiveMessageInput, error) {
 						in, err := sqs.GenerateReceiveMessageInputDefault(ctx, queueURL)
 						if err != nil {
 							return nil, err
@@ -169,6 +167,8 @@ func TestPublishSubscribe_with_TransparentUrlResolver(t *testing.T) {
 					},
 					Unmarshaler:      sqs.DefaultMarshalerUnmarshaler{},
 					QueueUrlResolver: queueResolver,
+					// Add delay for queue propagation in CI/localstack
+					QueuePropagationDelay: 200 * time.Millisecond,
 				},
 			)
 		},
@@ -200,9 +200,8 @@ func TestPublishSubscribe_batching(t *testing.T) {
 				t,
 				sqs.PublisherConfig{
 					AWSConfig: cfg,
-					OptFns: []func(*amazonsqs.Options){
-						GetEndpointResolverSqs(),
-					},
+					SQSOptFns: GetEndpointResolverSqs(),
+					S3OptsFns: GetEndpointResolverS3(),
 					CreateQueueConfig: sqs.QueueConfigAttributes{
 						// Default value is 30 seconds - need to be lower for tests
 						VisibilityTimeout: "1",
@@ -211,14 +210,13 @@ func TestPublishSubscribe_batching(t *testing.T) {
 				},
 				sqs.SubscriberConfig{
 					AWSConfig: cfg,
-					OptFns: []func(*amazonsqs.Options){
-						GetEndpointResolverSqs(),
-					},
+					SQSOptFns: GetEndpointResolverSqs(),
+					S3OptsFns: GetEndpointResolverS3(),
 					QueueConfigAttributes: sqs.QueueConfigAttributes{
 						// Default value is 30 seconds - need to be lower for tests
 						VisibilityTimeout: "1",
 					},
-					GenerateReceiveMessageInput: func(ctx context.Context, queueURL sqs.QueueURL) (*awssqs.ReceiveMessageInput, error) {
+					GenerateReceiveMessageInput: func(ctx context.Context, queueURL sqs.QueueURL) (*amazonsqs.ReceiveMessageInput, error) {
 						in, err := sqs.GenerateReceiveMessageInputDefault(ctx, queueURL)
 						if err != nil {
 							return nil, err
@@ -355,9 +353,8 @@ func TestPublishSubscribe_creating_queue_with_different_settings_should_be_idemp
 
 	sub1, err := sqs.NewSubscriber(sqs.SubscriberConfig{
 		AWSConfig: newAwsConfig(t),
-		OptFns: []func(*amazonsqs.Options){
-			GetEndpointResolverSqs(),
-		},
+		SQSOptFns: GetEndpointResolverSqs(),
+		S3OptsFns: GetEndpointResolverS3(),
 		QueueConfigAttributes: sqs.QueueConfigAttributes{
 			VisibilityTimeout: "1",
 		},
@@ -367,9 +364,8 @@ func TestPublishSubscribe_creating_queue_with_different_settings_should_be_idemp
 
 	sub2, err := sqs.NewSubscriber(sqs.SubscriberConfig{
 		AWSConfig: newAwsConfig(t),
-		OptFns: []func(*amazonsqs.Options){
-			GetEndpointResolverSqs(),
-		},
+		SQSOptFns: GetEndpointResolverSqs(),
+		S3OptsFns: GetEndpointResolverS3(),
 		QueueConfigAttributes: sqs.QueueConfigAttributes{
 			VisibilityTimeout: "20",
 		},
@@ -410,9 +406,8 @@ func TestSubscriber_doesnt_hang_when_queue_doesnt_exist(t *testing.T) {
 		t,
 		sqs.PublisherConfig{
 			AWSConfig: cfg,
-			OptFns: []func(*amazonsqs.Options){
-				GetEndpointResolverSqs(),
-			},
+			SQSOptFns: GetEndpointResolverSqs(),
+			S3OptsFns: GetEndpointResolverS3(),
 			CreateQueueConfig: sqs.QueueConfigAttributes{
 				// Default value is 30 seconds - need to be lower for tests
 				VisibilityTimeout: "1",
@@ -421,9 +416,8 @@ func TestSubscriber_doesnt_hang_when_queue_doesnt_exist(t *testing.T) {
 		},
 		sqs.SubscriberConfig{
 			AWSConfig: cfg,
-			OptFns: []func(*amazonsqs.Options){
-				GetEndpointResolverSqs(),
-			},
+			SQSOptFns: GetEndpointResolverSqs(),
+			S3OptsFns: GetEndpointResolverS3(),
 			QueueConfigAttributes: sqs.QueueConfigAttributes{
 				// Default value is 30 seconds - need to be lower for tests
 				VisibilityTimeout: "1",
@@ -447,9 +441,8 @@ func TestPublisher_do_not_create_queue(t *testing.T) {
 		t,
 		sqs.PublisherConfig{
 			AWSConfig: cfg,
-			OptFns: []func(*amazonsqs.Options){
-				GetEndpointResolverSqs(),
-			},
+			SQSOptFns: GetEndpointResolverSqs(),
+			S3OptsFns: GetEndpointResolverS3(),
 			CreateQueueConfig: sqs.QueueConfigAttributes{
 				// Default value is 30 seconds - need to be lower for tests
 				VisibilityTimeout: "1",
@@ -459,9 +452,8 @@ func TestPublisher_do_not_create_queue(t *testing.T) {
 		},
 		sqs.SubscriberConfig{
 			AWSConfig: cfg,
-			OptFns: []func(*amazonsqs.Options){
-				GetEndpointResolverSqs(),
-			},
+			SQSOptFns: GetEndpointResolverSqs(),
+			S3OptsFns: GetEndpointResolverS3(),
 			QueueConfigAttributes: sqs.QueueConfigAttributes{
 				// Default value is 30 seconds - need to be lower for tests
 				VisibilityTimeout: "1",
@@ -481,9 +473,8 @@ func createPubSub(t *testing.T) (message.Publisher, message.Subscriber) {
 		t,
 		sqs.PublisherConfig{
 			AWSConfig: cfg,
-			OptFns: []func(*amazonsqs.Options){
-				GetEndpointResolverSqs(),
-			},
+			SQSOptFns: GetEndpointResolverSqs(),
+			S3OptsFns: GetEndpointResolverS3(),
 			CreateQueueConfig: sqs.QueueConfigAttributes{
 				// Default value is 30 seconds - need to be lower for tests
 				VisibilityTimeout: "1",
@@ -492,9 +483,8 @@ func createPubSub(t *testing.T) (message.Publisher, message.Subscriber) {
 		},
 		sqs.SubscriberConfig{
 			AWSConfig: cfg,
-			OptFns: []func(*amazonsqs.Options){
-				GetEndpointResolverSqs(),
-			},
+			SQSOptFns: GetEndpointResolverSqs(),
+			S3OptsFns: GetEndpointResolverS3(),
 			QueueConfigAttributes: sqs.QueueConfigAttributes{
 				// Default value is 30 seconds - need to be lower for tests
 				VisibilityTimeout: "1",
@@ -535,10 +525,25 @@ func createPubSubWithConsumerGroup(t *testing.T, consumerGroup string) (message.
 	return createPubSub(t)
 }
 
-func GetEndpointResolverSqs() func(*amazonsqs.Options) {
-	return amazonsqs.WithEndpointResolverV2(sqs.OverrideEndpointResolver{
-		Endpoint: transport.Endpoint{
-			URI: url.URL{Scheme: "http", Host: "localhost:4566"},
+func GetEndpointResolverSqs() []func(*amazonsqs.Options) {
+	return []func(*amazonsqs.Options){
+		amazonsqs.WithEndpointResolverV2(sqs.OverrideEndpointResolver{
+			Endpoint: transport.Endpoint{
+				URI: url.URL{Scheme: "http", Host: "localhost:4566"},
+			},
+		}),
+	}
+}
+
+func GetEndpointResolverS3() []func(*amazons3.Options) {
+	return []func(*amazons3.Options){
+		amazons3.WithEndpointResolverV2(sqs.S3OverrideEndpointResolver{
+			Endpoint: transport.Endpoint{
+				URI: url.URL{Scheme: "http", Host: "localhost:4566"},
+			},
+		}),
+		func(options *amazons3.Options) {
+			options.UsePathStyle = true
 		},
-	})
+	}
 }

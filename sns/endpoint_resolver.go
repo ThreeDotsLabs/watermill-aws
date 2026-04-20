@@ -22,7 +22,7 @@ import (
 //	pub, err := sns.NewPublisher(sns.PublisherConfig{
 //			AWSConfig: cfg,
 //			Marshaler: sns.DefaultMarshalerUnmarshaler{},
-//			OptFns: []func(*amazonsns.Options){
+//			SNSOptFns: []func(*amazonsns.Options){
 //				amazonsns.WithEndpointResolverV2(sns.OverrideEndpointResolver{
 //					Endpoint: transport.Endpoint{
 //						URI: url.URL{Scheme: "http", Host: "localstack:4566"},

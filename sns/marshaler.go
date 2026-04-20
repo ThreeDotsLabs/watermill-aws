@@ -1,10 +1,13 @@
 package sns
 
 import (
-	"github.com/ThreeDotsLabs/watermill-aws/sqs"
+	"unsafe"
+
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/sns"
 	"github.com/aws/aws-sdk-go-v2/service/sns/types"
+
+	"github.com/Aryon-Security/watermill-aws/sqs"
 
 	"github.com/ThreeDotsLabs/watermill/message"
 )
@@ -25,8 +28,11 @@ func (d DefaultMarshalerUnmarshaler) Marshal(topicArn TopicArn, msg *message.Mes
 		DataType:    aws.String("String"),
 	}
 
+	// Create a string that shares the same underlying memory as the byte slice
+	// This avoids making a copy of the data
+	payloadStr := unsafe.String(unsafe.SliceData(msg.Payload), len(msg.Payload))
 	return &sns.PublishInput{
-		Message:                aws.String(string(msg.Payload)),
+		Message:                aws.String(payloadStr),
 		MessageAttributes:      attributes,
 		MessageDeduplicationId: deduplicationId,
 		MessageGroupId:         groupId,
