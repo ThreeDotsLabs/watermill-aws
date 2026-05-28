@@ -99,7 +99,6 @@ func (s *Subscriber) Subscribe(ctx context.Context, topic string) (<-chan *messa
 
 	var workersWg sync.WaitGroup
 	for i := 0; i < s.config.ConsumeWorkers; i++ {
-		s.subscribersWg.Add(1)
 		workersWg.Add(1)
 		go func() {
 			defer workersWg.Done()
@@ -107,7 +106,9 @@ func (s *Subscriber) Subscribe(ctx context.Context, topic string) (<-chan *messa
 		}()
 	}
 
+	s.subscribersWg.Add(1)
 	go func() {
+		defer s.subscribersWg.Done()
 		workersWg.Wait()
 		close(output)
 		cancel()
@@ -117,7 +118,6 @@ func (s *Subscriber) Subscribe(ctx context.Context, topic string) (<-chan *messa
 }
 
 func (s *Subscriber) receive(ctx context.Context, queueURL QueueURL, output chan *message.Message, input *sqs.ReceiveMessageInput) {
-	defer s.subscribersWg.Done()
 	ctx, cancelCtx := context.WithCancel(ctx)
 	defer cancelCtx()
 	logFields := watermill.LogFields{
@@ -206,7 +206,15 @@ func (s *Subscriber) processMessage(
 		"message_uuid": msg.UUID,
 	})
 
-	output <- msg
+	select {
+	case output <- msg:
+	case <-s.closing:
+		logger.Debug("Closing, message discarded before send", logFields)
+		return false
+	case <-ctx.Done():
+		logger.Debug("Closing, ctx cancelled before send", logFields)
+		return false
+	}
 
 	select {
 	case <-msg.Acked():

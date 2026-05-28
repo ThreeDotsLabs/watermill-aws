@@ -10,7 +10,6 @@ import (
 	awsconfig "github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/credentials"
 	amazonsqs "github.com/aws/aws-sdk-go-v2/service/sqs"
-	awssqs "github.com/aws/aws-sdk-go-v2/service/sqs"
 	transport "github.com/aws/smithy-go/endpoints"
 	"github.com/stretchr/testify/require"
 
@@ -88,7 +87,7 @@ func TestPublishSubscribe_with_GenerateQueueUrlResolver(t *testing.T) {
 						// Default value is 30 seconds - need to be lower for tests
 						VisibilityTimeout: "1",
 					},
-					GenerateReceiveMessageInput: func(ctx context.Context, queueURL sqs.QueueURL) (*awssqs.ReceiveMessageInput, error) {
+					GenerateReceiveMessageInput: func(ctx context.Context, queueURL sqs.QueueURL) (*amazonsqs.ReceiveMessageInput, error) {
 						in, err := sqs.GenerateReceiveMessageInputDefault(ctx, queueURL)
 						if err != nil {
 							return nil, err
@@ -156,7 +155,7 @@ func TestPublishSubscribe_with_TransparentUrlResolver(t *testing.T) {
 						// Default value is 30 seconds - need to be lower for tests
 						VisibilityTimeout: "1",
 					},
-					GenerateReceiveMessageInput: func(ctx context.Context, queueURL sqs.QueueURL) (*awssqs.ReceiveMessageInput, error) {
+					GenerateReceiveMessageInput: func(ctx context.Context, queueURL sqs.QueueURL) (*amazonsqs.ReceiveMessageInput, error) {
 						in, err := sqs.GenerateReceiveMessageInputDefault(ctx, queueURL)
 						if err != nil {
 							return nil, err
@@ -218,7 +217,7 @@ func TestPublishSubscribe_batching(t *testing.T) {
 						// Default value is 30 seconds - need to be lower for tests
 						VisibilityTimeout: "1",
 					},
-					GenerateReceiveMessageInput: func(ctx context.Context, queueURL sqs.QueueURL) (*awssqs.ReceiveMessageInput, error) {
+					GenerateReceiveMessageInput: func(ctx context.Context, queueURL sqs.QueueURL) (*amazonsqs.ReceiveMessageInput, error) {
 						in, err := sqs.GenerateReceiveMessageInputDefault(ctx, queueURL)
 						if err != nil {
 							return nil, err
@@ -330,7 +329,7 @@ func TestPublishSubscribe_concurrent_workers_with_batching(t *testing.T) {
 						// Default value is 30 seconds - need to be lower for tests
 						VisibilityTimeout: "1",
 					},
-					GenerateReceiveMessageInput: func(ctx context.Context, queueURL sqs.QueueURL) (*awssqs.ReceiveMessageInput, error) {
+					GenerateReceiveMessageInput: func(ctx context.Context, queueURL sqs.QueueURL) (*amazonsqs.ReceiveMessageInput, error) {
 						in, err := sqs.GenerateReceiveMessageInputDefault(ctx, queueURL)
 						if err != nil {
 							return nil, err
