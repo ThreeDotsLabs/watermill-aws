@@ -89,10 +89,19 @@ func (p *Publisher) GetQueueUrl(ctx context.Context, topic string, createIfNotEx
 		}
 
 		return resolvedQueue.QueueName, queueUrl, nil
-
-	} else {
-		return "", "", fmt.Errorf("queue for topic %s doesn't exist", topic)
 	}
+
+	// createIfNotExists is false. If the resolver didn't verify existence
+	// (Exists == nil, e.g. TransparentUrlResolver, which treats the topic
+	// as a pre-existing queue URL) then the caller has explicitly opted
+	// out of queue creation and asked us to trust the URL. Returning an
+	// error here would make DoNotCreateQueueIfNotExists impossible to use
+	// with that resolver (#632). Only fail when the resolver actively
+	// reported Exists == false.
+	if resolvedQueue.Exists == nil && resolvedQueue.QueueURL != nil {
+		return resolvedQueue.QueueName, *resolvedQueue.QueueURL, nil
+	}
+	return "", "", fmt.Errorf("queue for topic %s doesn't exist", topic)
 }
 
 func (p *Publisher) createQueue(ctx context.Context, topic string, queueName QueueName) (QueueURL, error) {
