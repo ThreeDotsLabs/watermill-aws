@@ -189,9 +189,11 @@ func (p TransparentUrlResolver) ResolveQueueUrl(ctx context.Context, params Reso
 
 	queueURL := QueueURL(params.Topic)
 
+	exists := true
+
 	return QueueUrlResolverResult{
 		QueueName: QueueName(queueName),
 		QueueURL:  &queueURL, // in this case topic maps to queue URL
-		Exists:    nil,       // we don't know
+		Exists:    &exists,   // topic IS the queue URL, so it exists by definition
 	}, nil
 }
