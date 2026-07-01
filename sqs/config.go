@@ -45,6 +45,19 @@ type SubscriberConfig struct {
 	// Defaults to 1.
 	ConsumeWorkers int
 
+	// CloseTimeout, when > 0, enables graceful draining on shutdown: once the
+	// subscriber starts closing, an in-flight message is not abandoned
+	// immediately. Its handler keeps a live (cancellation-detached) context and
+	// is given up to CloseTimeout to finish and ack, in which case the message
+	// is deleted normally instead of being redelivered. Only if the handler is
+	// still running when CloseTimeout elapses is its context canceled and the
+	// message abandoned for SQS to redeliver.
+	//
+	// When 0 (default), the previous behavior applies: in-flight handlers are
+	// canceled the moment the subscriber closes and their messages are left for
+	// redelivery.
+	CloseTimeout time.Duration
+
 	Unmarshaler Unmarshaler
 }
 
