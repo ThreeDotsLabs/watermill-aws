@@ -2,7 +2,6 @@
 <img align="right" width="200" src="https://watermill.io/img/gopher.svg">
 
 [![CI Status](https://github.com/ThreeDotsLabs/watermill-aws/actions/workflows/master.yml/badge.svg)](https://github.com/ThreeDotsLabs/watermill-aws/actions/workflows/master.yml)
-[![Go Report Card](https://goreportcard.com/badge/github.com/ThreeDotsLabs/watermill-aws)](https://goreportcard.com/report/github.com/ThreeDotsLabs/watermill-aws)
 
 This is Pub/Sub for the [Watermill](https://watermill.io/) project.
 It uses the [Amazon SQS](https://aws.amazon.com/sqs/) and [Amazon SNS](https://aws.amazon.com/sns/) services.
