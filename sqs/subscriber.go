@@ -192,15 +192,25 @@ func (s *Subscriber) processMessage(
 	logger := s.logger.With(logFields)
 	logger.Trace("processMessage", nil)
 
-	ctx, cancelCtx := context.WithCancel(ctx)
-	defer cancelCtx()
+	// handlerCtx is the context the handler sees. When graceful draining is
+	// enabled we detach it from receiver/close cancellation so an in-flight
+	// handler can finish during shutdown instead of being aborted mid-work; its
+	// lifetime is then bounded by the drain deadline below (and by any
+	// handler-side timeout). With draining disabled it stays tied to the
+	// receiver context, preserving the previous cancel-on-close behavior.
+	handlerCtx := ctx
+	if s.config.CloseTimeout > 0 {
+		handlerCtx = context.WithoutCancel(ctx)
+	}
+	handlerCtx, cancelMsg := context.WithCancel(handlerCtx)
+	defer cancelMsg()
 
 	msg, err := s.config.Unmarshaler.Unmarshal(&sqsMsg)
 	if err != nil {
 		logger.Error("Cannot unmarshal message", err, logFields)
 		return false
 	}
-	msg.SetContext(ctx)
+	msg.SetContext(handlerCtx)
 
 	logger = s.logger.With(logFields).With(watermill.LogFields{
 		"message_uuid": msg.UUID,
@@ -216,38 +226,85 @@ func (s *Subscriber) processMessage(
 		return false
 	}
 
-	select {
-	case <-msg.Acked():
-		err := s.deleteMessage(ctx, queueURL, sqsMsg.ReceiptHandle, logFields)
-		if errors.Is(err, context.Canceled) {
-			return false
+	// Wait for the handler to finish. On shutdown (s.closing, or the receiver
+	// context being canceled) we begin a bounded drain rather than abandoning
+	// the message outright: the handler keeps running for up to CloseTimeout so
+	// its work can complete and be acked. Only when that deadline elapses do we
+	// cancel the handler and abandon the message for redelivery.
+	closing := s.closing
+	ctxDone := ctx.Done()
+	var (
+		drainTimer    *time.Timer
+		drainDeadline <-chan time.Time
+	)
+	defer func() {
+		if drainTimer != nil {
+			drainTimer.Stop()
 		}
-		if err != nil {
-			logger.Error("Failed to delete message", err, logFields)
-			return false
+	}()
+	startDrain := func() {
+		if drainTimer != nil {
+			return
 		}
-	case <-msg.Nacked():
-		// Do not delete message, it will be redelivered
-		logger.Debug("Nacking message", logFields)
-		return false // we don't want to process next messages to preserve order for FIFO
-	case <-s.closing:
-		logger.Debug("Closing, message discarded before ack", logFields)
-		return false
-	case <-ctx.Done():
-		logger.Debug("Closing, ctx cancelled before ack", logFields)
-		return false
+		logger.Debug("Subscriber closing, draining in-flight message", logFields)
+		drainTimer = time.NewTimer(s.config.CloseTimeout)
+		drainDeadline = drainTimer.C
 	}
 
-	return true
+	for {
+		select {
+		case <-msg.Acked():
+			err := s.deleteMessage(handlerCtx, queueURL, sqsMsg.ReceiptHandle, logFields)
+			if errors.Is(err, context.Canceled) {
+				return false
+			}
+			if err != nil {
+				logger.Error("Failed to delete message", err, logFields)
+				return false
+			}
+			return true
+		case <-msg.Nacked():
+			// Do not delete message, it will be redelivered
+			logger.Debug("Nacking message", logFields)
+			return false // we don't want to process next messages to preserve order for FIFO
+		case <-closing:
+			closing = nil // a closed channel is always ready; react once
+			if s.config.CloseTimeout <= 0 {
+				logger.Debug("Closing, message discarded before ack", logFields)
+				return false
+			}
+			startDrain()
+		case <-ctxDone:
+			ctxDone = nil
+			if s.config.CloseTimeout <= 0 {
+				logger.Debug("Closing, ctx cancelled before ack", logFields)
+				return false
+			}
+			startDrain()
+		case <-drainDeadline:
+			cancelMsg()
+			logger.Info("Drain deadline exceeded before ack, abandoning in-flight message", logFields)
+			return false
+		}
+	}
 }
 
 func (s *Subscriber) deleteMessage(ctx context.Context, queueURL QueueURL, receiptHandle *string, logFields watermill.LogFields) error {
+	// With draining enabled the ack (and this delete) can happen after shutdown
+	// began. The caller passes a cancellation-detached context so the delete is
+	// not aborted by close; bound it here so a slow delete can't hang shutdown.
+	if s.config.CloseTimeout > 0 {
+		var cancel context.CancelFunc
+		ctx, cancel = context.WithTimeout(ctx, s.config.CloseTimeout)
+		defer cancel()
+	}
+
 	input, err := s.config.GenerateDeleteMessageInput(ctx, queueURL, receiptHandle)
 	if err != nil {
 		return fmt.Errorf("cannot generate input for delete message: %w", err)
 	}
 
-	// we are using ctx that may be canceled when subscriber is closed
+	// With draining disabled, ctx may be canceled when the subscriber is closing.
 	//
 	// it may lead to re-delivery when message is processed and in the meantime
 	// subscriber is closed - but we don't know if context cancellation didn't cancel
