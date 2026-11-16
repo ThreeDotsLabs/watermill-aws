@@ -21,6 +21,43 @@ Getting started guide: https://watermill.io/docs/getting-started/
 
 Issues: https://github.com/ThreeDotsLabs/watermill/issues
 
+## Usage
+
+### SQS only
+
+SQS works as a plain queue and does not require SNS. `sqs.NewPublisher` publishes directly to the queue, and `sqs.NewSubscriber` reads from it. Multiple subscribers on the same queue compete for messages.
+
+```go
+awsCfg, err := config.LoadDefaultConfig(ctx)
+if err != nil {
+    return err
+}
+
+logger := watermill.NewStdLogger(false, false)
+
+publisher, err := sqs.NewPublisher(sqs.PublisherConfig{AWSConfig: awsCfg}, logger)
+if err != nil {
+    return err
+}
+
+subscriber, err := sqs.NewSubscriber(sqs.SubscriberConfig{AWSConfig: awsCfg}, logger)
+if err != nil {
+    return err
+}
+
+messages, err := subscriber.Subscribe(ctx, "fhir-subscription-events")
+```
+
+The topic passed to `Publish` and `Subscribe` is the queue name. Queues are created on demand, unless `DoNotCreateQueueIfNotExists` is set.
+
+### SNS fan-out
+
+Use `sns.NewPublisher` when one publish must reach several queues. Each queue needs its own SNS subscription, which this module does not create.
+
+```go
+publisher, err := sns.NewPublisher(sns.PublisherConfig{AWSConfig: awsCfg}, logger)
+```
+
 ## Contributing
 
 All contributions are very much welcome. If you'd like to help with Watermill development,
